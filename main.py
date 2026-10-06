@@ -5,12 +5,11 @@ from PySide6.QtGui import QAction, QFontDatabase, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 from utils.resource_utils import resource_path
 from models.database import init_db
-from views.main_window import MainWindow
 
 
 def load_fonts():
     QFontDatabase.addApplicationFont(
-        resource_path("assets/fonts/Inter/Inter-Regular.ttf")
+        resource_path("assets/fonts/Inter/Inter.ttf")
     )
 
 
@@ -40,6 +39,8 @@ def build_tray_icon():
 
 
 def main():
+    from views.main_window import MainWindow
+
     init_db()  # create tables if DB doesn't exist yet (first run / fresh install)
 
     app = QApplication(sys.argv)
@@ -99,4 +100,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--smoke-test" in sys.argv:
+        import argparse
+        from utils.release_checks import run_smoke_test
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--smoke-test", required=True, metavar="RESULT_JSON")
+        args = parser.parse_args()
+        sys.exit(run_smoke_test(args.smoke_test))
+    else:
+        main()

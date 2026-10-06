@@ -1,0 +1,52 @@
+name: Windows installer candidate
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+          architecture: x64
+      - name: Install verified Inno Setup 6.4.3
+        shell: pwsh
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.4.3.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_4_3/innosetup-6.4.3.exe' -OutFile $setup
+          if ((Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'f3c42116542c4cc57263c5ba6c4feabfc49fe771f2f98a79d2f7628b8762723b') {
+            throw 'Inno Setup installer checksum mismatch.'
+          }
+          $inno = Join-Path $env:RUNNER_TEMP 'InnoSetup643'
+          $process = Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$inno" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Inno Setup installation failed.' }
+          "TUNGA_ISCC=$inno\ISCC.exe" >> $env:GITHUB_ENV
+      - name: Build candidate
+        shell: pwsh
+        run: ./tools/build_windows.ps1 -IsccPath $env:TUNGA_ISCC
+      - name: Verify install, frozen runtime and data preservation
+        shell: pwsh
+        run: python tools/verify_windows_install.py installer/Output/TungaLibrarySetup.exe release-checks
+      - name: Upload candidate and verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TungaLibrary-windows-candidate-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            installer/Output/TungaLibrarySetup.exe
+            installer/Output/TungaLibrarySetup.exe.sha256
+            build-environment.txt
+            release-checks/
+            build/TungaLibrary/warn-TungaLibrary.txt
