@@ -11,7 +11,16 @@ from pathlib import Path
 
 
 def run(args, cwd=None):
-    subprocess.run([str(arg) for arg in args], cwd=cwd, check=True, timeout=180)
+    try:
+        subprocess.run([str(arg) for arg in args], cwd=cwd, check=True, timeout=180)
+    except subprocess.CalledProcessError:
+        # Windowed executables have no stdout; expose their JSON diagnostics in
+        # the host test runner's log before propagating the failure.
+        if "--smoke-test" in args:
+            result_path = Path(args[args.index("--smoke-test") + 1])
+            if result_path.is_file():
+                print(result_path.read_text(encoding="utf-8"), flush=True)
+        raise
 
 
 def verify(installer, results_dir):
