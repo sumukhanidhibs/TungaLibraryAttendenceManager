@@ -4,11 +4,20 @@ import os
 import sys
 import tempfile
 import traceback
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import date
 from pathlib import Path
 
 from utils.resource_utils import data_path, get_base_path, resource_path
+
+
+@contextmanager
+def _preserve_working_directory():
+    previous = Path.cwd()
+    try:
+        yield
+    finally:
+        os.chdir(previous)
 
 
 def run_smoke_test(result_path):
@@ -42,7 +51,9 @@ def run_smoke_test(result_path):
         chart = QChart()
         check(chart is not None, "Qt Charts loads")
 
-        with tempfile.TemporaryDirectory(prefix="tunga-release-") as tmp:
+        # Exit the cwd guard before TemporaryDirectory removes its root.
+        # Windows locks the current directory against deletion.
+        with tempfile.TemporaryDirectory(prefix="tunga-release-") as tmp, _preserve_working_directory():
             tmp = Path(tmp)
             os.chdir(tmp)
             check(Path(data_path("data/attendance.db")) == get_base_path() / "data/attendance.db",
@@ -99,3 +110,4 @@ def run_smoke_test(result_path):
         result_path.parent.mkdir(parents=True, exist_ok=True)
         result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     return 0 if result["passed"] else 1
+
