@@ -42,6 +42,16 @@ def verify(installer, results_dir):
     with tempfile.TemporaryDirectory(prefix="tunga-install-") as tmp:
         tmp = Path(tmp)
         app = tmp / "TungaLibrary Attendance Manager"
+
+        def registered_uninstaller():
+            # Inno can allocate unins001.exe after a reinstall. Use the current
+            # registration, rather than assuming a fixed uninstaller number.
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
+                command = winreg.QueryValueEx(handle, "UninstallString")[0]
+            path = Path(command.strip().strip('"'))
+            assert path.parent.resolve() == app.resolve() and path.is_file(), command
+            return path
+
         switches = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=", f"/DIR={app}"]
         run([installer, *switches, f"/LOG={results_dir / 'install.log'}"])
         exe = app / "TungaLibrary.exe"
@@ -52,6 +62,7 @@ def verify(installer, results_dir):
         run([exe, "--smoke-test", smoke], cwd=tmp)
         result = json.loads(smoke.read_text(encoding="utf-8"))
         assert result["passed"] and result["frozen"], result
+        print("PASS: installed frozen runtime smoke", flush=True)
 
         # Seed a user-created fixture, then demand byte-for-byte persistence.
         db = app / "data" / "attendance.db"
@@ -73,14 +84,17 @@ def verify(installer, results_dir):
 
         run([installer, *switches, f"/LOG={results_dir / 'upgrade.log'}"])
         assert_preserved()
-        run([app / "unins000.exe", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+        print("PASS: upgrade preserves database, photo and report", flush=True)
+        run([registered_uninstaller(), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
              f"/LOG={results_dir / 'uninstall.log'}"])
         assert_preserved()
         assert not exe.exists(), "Uninstaller left executable behind"
+        print("PASS: uninstall removes app and preserves user data", flush=True)
         run([installer, *switches, f"/LOG={results_dir / 'reinstall.log'}"])
         assert_preserved()
         run([exe, "--smoke-test", results_dir / "reinstalled-smoke.json"], cwd=tmp)
-        run([app / "unins000.exe", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"])
+        print("PASS: reinstall preserves user data and frozen runtime works", flush=True)
+        run([registered_uninstaller(), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"])
     (results_dir / "installer-verification.json").write_text(
         json.dumps({"passed": True, "checks": ["install", "frozen smoke", "upgrade preserves user data",
                                                "uninstall preserves user data", "reinstall preserves user data"]}, indent=2),
@@ -93,3 +107,4 @@ if __name__ == "__main__":
     parser.add_argument("results_dir")
     args = parser.parse_args()
     verify(args.installer, args.results_dir)
+
