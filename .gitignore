@@ -18,6 +18,9 @@ env/
 # Build / Distribution
 build/
 dist/
+installer/Output/
+release-checks/
+build-environment.txt
 *.spec
 # Keep our PyInstaller spec file
 !TungaLibrary.spec

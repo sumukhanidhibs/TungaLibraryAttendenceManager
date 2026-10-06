@@ -13,11 +13,11 @@
 ; ============================================================
 
 #define AppName        "TungaLibrary Attendance Manager"
-#define AppVersion     "1.0.0"
+#define AppVersion     "1.0.1"
 #define AppPublisher   "Tunga Mahavidyalaya"
 #define AppExeName     "TungaLibrary.exe"
 #define AppId          "{{A3F2C1D4-5E6B-7F8A-9B0C-1D2E3F4A5B6C}"
-; ^^^ Change this GUID if you ever release a new major version
+; Keep this GUID stable for upgrades of the same application.
 
 ; Path to PyInstaller output — relative to this .iss file (../dist/TungaLibrary)
 #define DistDir        "..\dist\TungaLibrary"
@@ -33,16 +33,19 @@ DefaultGroupName={#AppName}
 AllowNoIcons=yes
 ; No admin required — per-user install
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+; Do not offer elevation: persistent data is written beside the executable.
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=Output
 OutputBaseFilename=TungaLibrarySetup
 SetupIconFile=..\assets\logo.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-; Minimum Windows version: Windows 10
-MinVersion=10.0.10240
-DisableDirPage=no
+; Release target: Windows 10 22H2 (x64) and Windows 11 (x64).
+MinVersion=10.0.19045
+DisableDirPage=yes
+UsePreviousAppDir=no
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
@@ -51,8 +54,8 @@ UninstallDisplayName={#AppName}
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon";  Description: "Create a &desktop shortcut";  GroupDescription: "Additional icons:"; Flags: checked
-Name: "startmenuicon"; Description: "Create a &Start Menu shortcut"; GroupDescription: "Additional icons:"; Flags: checked
+Name: "desktopicon";  Description: "Create a &desktop shortcut";  GroupDescription: "Additional icons:"
+Name: "startmenuicon"; Description: "Create a &Start Menu shortcut"; GroupDescription: "Additional icons:"
 
 ; ── Files ──────────────────────────────────────────────────────────────────
 
@@ -60,20 +63,19 @@ Name: "startmenuicon"; Description: "Create a &Start Menu shortcut"; GroupDescri
 ; The entire PyInstaller output folder (exe + all Qt DLLs + bundled assets)
 Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; Student photos — kept alongside the exe so the app can find them
-Source: "..\photos\*"; DestDir: "{app}\photos"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-; Database — copy the initial (possibly seeded) DB; never overwrite on upgrade
-Source: "..\data\attendance.db"; DestDir: "{app}\data"; Flags: ignoreversion onlyifdoesntexist
+; User data is never an installer payload. main.py creates an empty DB on first
+; launch; import students using CSV, then copy approved photos to {app}\photos.
+; This prevents upgrades from replacing user data and keeps it out of the
+; uninstall file log. Do not add production databases or photos here.
 
 ; ── Shortcuts ──────────────────────────────────────────────────────────────
 
 [Icons]
 ; Desktop shortcut
-Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\assets\logo.ico"; Tasks: desktopicon
+Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 ; Start Menu shortcut
-Name: "{userprograms}\{#AppName}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\assets\logo.ico"; Tasks: startmenuicon
+Name: "{userprograms}\{#AppName}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"; Tasks: startmenuicon
 
 ; Uninstall entry in Start Menu
 Name: "{userprograms}\{#AppName}\Uninstall {#AppName}"; Filename: "{uninstallexe}"; Tasks: startmenuicon
@@ -81,20 +83,19 @@ Name: "{userprograms}\{#AppName}\Uninstall {#AppName}"; Filename: "{uninstallexe
 ; ── Run after install ──────────────────────────────────────────────────────
 
 [Run]
-Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName} now"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Description: "Launch {#AppName} now"; Flags: nowait postinstall skipifsilent
 
 ; ── Uninstall ──────────────────────────────────────────────────────────────
 
-[UninstallDelete]
-; Remove auto-created report folders on uninstall (leave data/ so DB is preserved)
-Type: filesandordirs; Name: "{app}\reports"
+; Uninstall removes application files only. Retain attendance, photos and reports.
 
 ; ── Code section — create writable dirs if missing ─────────────────────────
 
 [Dirs]
 ; Ensure reports and photos dirs exist on fresh install
-Name: "{app}\reports\daily"
-Name: "{app}\reports\monthly"
-Name: "{app}\reports\student"
-Name: "{app}\photos"
-Name: "{app}\data"
+Name: "{app}\reports"; Flags: uninsneveruninstall
+Name: "{app}\reports\daily"; Flags: uninsneveruninstall
+Name: "{app}\reports\monthly"; Flags: uninsneveruninstall
+Name: "{app}\reports\student"; Flags: uninsneveruninstall
+Name: "{app}\photos"; Flags: uninsneveruninstall
+Name: "{app}\data"; Flags: uninsneveruninstall

@@ -1,0 +1,20 @@
+# Windows x64 release environment, Python 3.11.9.
+# Install this file instead of the open-ended development requirements.txt.
+PySide6==6.8.3
+PySide6_Addons==6.8.3
+PySide6_Essentials==6.8.3
+shiboken6==6.8.3
+openpyxl==3.1.5
+et_xmlfile==2.0.0
+reportlab==4.4.3
+pillow==11.3.0
+charset-normalizer==3.4.3
+pynput==1.8.1
+six==1.17.0
+pyinstaller==6.16.0
+pyinstaller-hooks-contrib==2025.8
+altgraph==0.17.4
+packaging==25.0
+setuptools==80.9.0
+pefile==2023.2.7
+pywin32-ctypes==0.2.3
