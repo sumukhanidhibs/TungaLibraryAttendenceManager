@@ -4,6 +4,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QFontDatabase, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 from utils.resource_utils import resource_path
+from models.database import init_db
 from views.main_window import MainWindow
 
 
@@ -17,6 +18,7 @@ def load_stylesheet(app, path):
     full_path = resource_path(path)
     with open(full_path, "r", encoding="utf-8") as f:
         app.setStyleSheet(f.read())
+
 
 def build_tray_icon():
     icon = QIcon()
@@ -37,63 +39,64 @@ def build_tray_icon():
     return icon
 
 
-app = QApplication(sys.argv)
-load_fonts()
-# LOAD THEME HERE
-load_stylesheet(app, "themes/light.qss")
- # switch anytime
+def main():
+    init_db()  # create tables if DB doesn't exist yet (first run / fresh install)
 
-window = MainWindow()
+    app = QApplication(sys.argv)
+    load_fonts()
+    load_stylesheet(app, "themes/light.qss")
 
-tray_icon = build_tray_icon()
-if not tray_icon.isNull():
-    app.setWindowIcon(tray_icon)
+    window = MainWindow()
 
-tray = QSystemTrayIcon(app)
-tray.setIcon(tray_icon)
-tray.setToolTip("Library Attendance System")
+    tray_icon = build_tray_icon()
+    if not tray_icon.isNull():
+        app.setWindowIcon(tray_icon)
 
-menu = QMenu()
+    tray = QSystemTrayIcon(app)
+    tray.setIcon(tray_icon)
+    tray.setToolTip("Library Attendance System")
 
-open_action = QAction("Open Dashboard")
-exit_action = QAction("Exit (Admin)")
+    menu = QMenu()
+    open_action = QAction("Open Dashboard")
+    exit_action = QAction("Exit (Admin)")
+    menu.addAction(open_action)
+    menu.addSeparator()
+    menu.addAction(exit_action)
+    tray.setContextMenu(menu)
+    app.setQuitOnLastWindowClosed(False)
 
-menu.addAction(open_action)
-menu.addSeparator()
-menu.addAction(exit_action)
-
-tray.setContextMenu(menu)
-app.setQuitOnLastWindowClosed(False)
-
-def show_dashboard():
-    window.show()
-    window.raise_()
-    window.activateWindow()
-    window.showMaximized()  # or showFullScreen()
-    window.raise_()
-
-def exit_app():
-    tray.hide()
-    window.kiosk_mode = False
-    window.close()
-    app.quit()
-
-open_action.triggered.connect(show_dashboard)
-exit_action.triggered.connect(exit_app)
-
-tray.activated.connect(
-    lambda reason: show_dashboard()
-    if reason == QSystemTrayIcon.Trigger else None
-)
-
-def init_tray():
-    if QSystemTrayIcon.isSystemTrayAvailable() and not tray.icon().isNull():
-        window.hide()
-        tray.show()
-    else:
-        window.kiosk_mode = False
+    def show_dashboard():
+        window.show()
+        window.raise_()
+        window.activateWindow()
         window.showMaximized()
+        window.raise_()
 
-QTimer.singleShot(0, init_tray)
+    def exit_app():
+        tray.hide()
+        window.kiosk_mode = False
+        window.close()
+        app.quit()
 
-sys.exit(app.exec())
+    open_action.triggered.connect(show_dashboard)
+    exit_action.triggered.connect(exit_app)
+
+    tray.activated.connect(
+        lambda reason: show_dashboard()
+        if reason == QSystemTrayIcon.Trigger else None
+    )
+
+    def init_tray():
+        if QSystemTrayIcon.isSystemTrayAvailable() and not tray.icon().isNull():
+            window.hide()
+            tray.show()
+        else:
+            window.kiosk_mode = False
+            window.showMaximized()
+
+    QTimer.singleShot(0, init_tray)
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
